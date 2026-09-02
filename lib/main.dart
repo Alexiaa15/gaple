@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'screens/home_screen.dart';
-import 'theme/app_colors.dart';
+import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,15 +22,20 @@ class GapleScoreApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Skor Gaple',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: AppColors.primaryGreen,
-        scaffoldBackgroundColor: AppColors.cream,
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
+    // Dengarkan themeController — begitu mode gelap/terang diganti,
+    // seluruh aplikasi otomatis rebuild dengan tema baru.
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Skor Gaple',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeController.mode,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }

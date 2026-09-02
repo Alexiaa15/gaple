@@ -5,6 +5,13 @@ class PointEntry {
 
   final String id;
   int points;
+
+  Map<String, dynamic> toJson() => {'id': id, 'points': points};
+
+  factory PointEntry.fromJson(Map<String, dynamic> json) => PointEntry(
+        id: json['id'] as String,
+        points: json['points'] as int,
+      );
 }
 
 /// Model untuk satu tim dalam permainan gaple.
@@ -36,4 +43,22 @@ class Team {
 
   /// Reset histori poin ronde (dipanggil setelah salah satu tim mencapai target).
   void resetRound() => entries.clear();
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'matchScore': matchScore,
+        'entries': entries.map((e) => e.toJson()).toList(),
+      };
+
+  factory Team.fromJson(Map<String, dynamic> json) {
+    final team = Team(
+      name: json['name'] as String,
+      matchScore: json['matchScore'] as int? ?? 0,
+    );
+    final rawEntries = (json['entries'] as List?) ?? [];
+    for (final e in rawEntries) {
+      team.addEntry(PointEntry.fromJson(e as Map<String, dynamic>));
+    }
+    return team;
+  }
 }

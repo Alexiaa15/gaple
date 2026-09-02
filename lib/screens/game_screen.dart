@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../models/game_controller.dart';
 import '../models/team.dart';
+import '../services/match_storage.dart';
 import '../theme/app_colors.dart';
+import '../theme/theme_controller.dart';
 
 /// Palet warna tema untuk tiap tim, supaya kedua panel mudah dibedakan
 /// sekilas mata (bukan sekadar teks polos di atas putih).
@@ -27,19 +29,21 @@ const _teamBColors = _TeamTheme(
 );
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.teamAName, required this.teamBName});
+  const GameScreen({super.key, required this.teamA, required this.teamB});
 
-  final String teamAName;
-  final String teamBName;
+  final Team teamA;
+  final Team teamB;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late final Team _teamA = Team(name: widget.teamAName);
-  late final Team _teamB = Team(name: widget.teamBName);
+  late final Team _teamA = widget.teamA;
+  late final Team _teamB = widget.teamB;
   late final GameController _controller = GameController(teamA: _teamA, teamB: _teamB);
+
+  Future<void> _persist() => MatchStorage.save(teamA: _teamA, teamB: _teamB);
 
   Future<int?> _showPointsInputDialog({required String title, int? initialValue}) {
     final textController = TextEditingController(
@@ -88,6 +92,7 @@ class _GameScreenState extends State<GameScreen> {
 
     final result = _controller.addPoints(team, points);
     setState(() {});
+    await _persist();
     if (result.roundEnded) _showRoundEndedDialog(result.winner!, result.loserWasZero!);
   }
 
@@ -100,21 +105,27 @@ class _GameScreenState extends State<GameScreen> {
 
     final result = _controller.editEntry(team, entry.id, newPoints);
     setState(() {});
+    await _persist();
     if (result.roundEnded) _showRoundEndedDialog(result.winner!, result.loserWasZero!);
   }
 
-  void _deleteEntry(Team team, PointEntry entry) {
+  Future<void> _deleteEntry(Team team, PointEntry entry) async {
     final index = _controller.deleteEntryById(team, entry.id);
     setState(() {});
+    await _persist();
 
     if (index == -1) return;
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         content: Text('Poin ${entry.points} milik ${team.name} dihapus'),
         action: SnackBarAction(
           label: 'Urungkan',
-          onPressed: () => setState(() => team.insertEntryAt(index, entry)),
+          onPressed: () {
+            setState(() => team.insertEntryAt(index, entry));
+            _persist();
+          },
         ),
       ),
     );
@@ -169,10 +180,21 @@ class _GameScreenState extends State<GameScreen> {
       ),
     );
 
-    if (confirmed == true) setState(() => _controller.resetMatch());
+    if (confirmed == true) {
+      setState(() => _controller.resetMatch());
+      await _persist();
+    }
   }
 
-  Widget _buildTeamPanel(Team team, _TeamTheme theme) {
+  Color _sectionBackground(bool isDark, Color lightTint) {
+    if (!isDark) return lightTint;
+    return Color.alphaBlend(lightTint.withOpacity(0.20), const Color(0xFF10140E));
+  }
+
+  Widget _buildTeamPanel(BuildContext context, Team team, _TeamTheme theme) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sectionTextColor = isDark ? Colors.white : theme.dark;
+
     return Expanded(
       child: Container(
         margin: const EdgeInsets.all(8),
@@ -180,7 +202,7 @@ class _GameScreenState extends State<GameScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: theme.primary.withOpacity(0.25),
+              color: theme.primary.withOpacity(isDark ? 0.35 : 0.25),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -275,7 +297,7 @@ class _GameScreenState extends State<GameScreen> {
 
             // Poin sementara (akumulasi ronde berjalan) — angka besar, tanpa "/101".
             Container(
-              color: theme.light,
+              color: _sectionBackground(isDark, theme.light),
               padding: const EdgeInsets.symmetric(vertical: 18),
               child: Column(
                 children: [
@@ -285,7 +307,7 @@ class _GameScreenState extends State<GameScreen> {
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.1,
-                      color: theme.dark.withOpacity(0.7),
+                      color: sectionTextColor.withOpacity(0.7),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -297,7 +319,7 @@ class _GameScreenState extends State<GameScreen> {
                       style: TextStyle(
                         fontSize: 44,
                         fontWeight: FontWeight.w800,
-                        color: theme.dark,
+                        color: sectionTextColor,
                         height: 1,
                       ),
                     ),
@@ -309,19 +331,22 @@ class _GameScreenState extends State<GameScreen> {
             // Histori entri poin — bisa diedit/dihapus.
             Expanded(
               child: Container(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 child: team.entries.isEmpty
                     ? Center(
                         child: Text(
                           'Belum ada poin\nmasuk di ronde ini',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                          style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
                         ),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         itemCount: team.entries.length,
-                        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: isDark ? Colors.white12 : Colors.grey.shade200,
+                        ),
                         itemBuilder: (context, index) {
                           final entry = team.entries[index];
                           return Padding(
@@ -333,12 +358,16 @@ class _GameScreenState extends State<GameScreen> {
                                   height: 22,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: theme.light,
+                                    color: _sectionBackground(isDark, theme.light),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Text(
                                     '${index + 1}',
-                                    style: TextStyle(fontSize: 10, color: theme.dark, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: sectionTextColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -398,7 +427,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Skor Gaple'),
         flexibleSpace: Container(
@@ -413,6 +442,14 @@ class _GameScreenState extends State<GameScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          AnimatedBuilder(
+            animation: themeController,
+            builder: (context, _) => IconButton(
+              onPressed: themeController.toggle,
+              icon: Icon(themeController.isDark ? Icons.light_mode : Icons.dark_mode),
+              tooltip: themeController.isDark ? 'Mode Terang' : 'Mode Gelap',
+            ),
+          ),
           IconButton(
             onPressed: _confirmResetMatch,
             icon: const Icon(Icons.refresh),
@@ -423,8 +460,8 @@ class _GameScreenState extends State<GameScreen> {
       body: SafeArea(
         child: Row(
           children: [
-            _buildTeamPanel(_teamA, _teamAColors),
-            _buildTeamPanel(_teamB, _teamBColors),
+            _buildTeamPanel(context, _teamA, _teamAColors),
+            _buildTeamPanel(context, _teamB, _teamBColors),
           ],
         ),
       ),

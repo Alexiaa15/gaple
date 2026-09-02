@@ -68,7 +68,7 @@ class GuideScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Panduan'),
         foregroundColor: Colors.white,
@@ -92,7 +92,7 @@ class GuideScreen extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
@@ -108,10 +108,18 @@ class GuideScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.creamCard,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.primaryGreenDark.withOpacity(0.35)
+                        : AppColors.creamCard,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(item.icon, color: AppColors.primaryGreenDark, size: 22),
+                  child: Icon(
+                    item.icon,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.primaryGreenLight
+                        : AppColors.primaryGreenDark,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -120,16 +128,24 @@ class GuideScreen extends StatelessWidget {
                     children: [
                       Text(
                         item.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primaryGreenDark,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.primaryGreenLight
+                              : AppColors.primaryGreenDark,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         item.description,
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade300
+                              : Colors.grey.shade700,
+                        ),
                       ),
                     ],
                   ),

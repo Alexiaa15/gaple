@@ -26,8 +26,7 @@ class GameController {
   final Team teamA;
   final Team teamB;
 
-  int _nextId = 0;
-  String _generateId() => '${_nextId++}_${DateTime.now().microsecondsSinceEpoch}';
+  String _generateId() => DateTime.now().microsecondsSinceEpoch.toString();
 
   /// Tambahkan entri poin baru ke [team], lalu cek apakah ronde berakhir.
   RoundResult addPoints(Team team, int points) {
